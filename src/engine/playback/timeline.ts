@@ -1,5 +1,7 @@
+import { NORMAL_SCALE, POSITION_SCALE } from "./motion";
+import type { MotionMessage } from "../sim/worker";
 import type { KnotDef } from "../knots/types";
-import { firstFrame, frameCount, type BakeChunk } from "../sim/bake";
+import { firstFrame, frameCount } from "../sim/bake";
 import { DEFAULT_PHYSICS, FPS, particleCount, type RopePhysics } from "../sim/rope";
 
 /**
@@ -14,9 +16,10 @@ export class Timeline {
   readonly duration: number;
   baked = 0;
   private readonly total: number;
-  private readonly frames: Float32Array;
-  private readonly normals: Float32Array;
+  private frames: Float32Array;
+  private normals: Float32Array;
   private readonly out = { positions: new Float32Array(0), normals: new Float32Array(0) };
+  private packed?: Int16Array;
   private readonly worker: Worker;
 
   constructor(knot: KnotDef, onProgress: () => void, physics: RopePhysics = DEFAULT_PHYSICS) {
@@ -24,25 +27,46 @@ export class Timeline {
     this.n = this.counts.reduce((a, b) => a + b, 0);
     this.total = frameCount(knot);
     this.duration = (this.total - 1) / FPS;
-    this.frames = new Float32Array(this.total * this.n * 3);
-    this.normals = new Float32Array(this.total * this.n * 3);
+    const first = firstFrame(knot, physics);
+    this.frames = first.frames;
+    this.normals = first.normals;
+    this.baked = 1;
     this.out = { positions: new Float32Array(this.n * 3), normals: new Float32Array(this.n * 3) };
     const worker = (this.worker = new Worker(new URL("../sim/worker.ts", import.meta.url), {
       type: "module",
     }));
-    const store = ({ start, frames, normals }: BakeChunk) => {
-      this.frames.set(frames, start * this.n * 3);
-      this.normals.set(normals, start * this.n * 3);
-      this.baked = start + frames.length / (this.n * 3);
+    const simulate = () => {
+      const length = this.total * this.n * 3;
+      this.frames = new Float32Array(length);
+      this.normals = new Float32Array(length);
+      this.frames.set(first.frames);
+      this.normals.set(first.normals);
+      worker.postMessage({ kind: "simulate", knot, physics });
     };
-    // The start pose is ready at once, so the rope shows while the worker bakes the rest.
-    store(firstFrame(knot, physics));
-    worker.onmessage = (e: MessageEvent<BakeChunk>) => {
-      store(e.data);
-      if (this.baked >= this.total) worker.terminate();
+    worker.onmessage = ({ data }: MessageEvent<MotionMessage>) => {
+      if (data.kind === "unavailable") {
+        simulate();
+        return;
+      }
+      if (data.kind === "loaded") {
+        this.packed = data.samples;
+        this.baked = this.total;
+      } else {
+        const { start, frames, normals } = data.chunk;
+        const stride = this.n * 3;
+        this.frames.set(frames, start * stride);
+        this.normals.set(normals, start * stride);
+        this.baked = start + frames.length / stride;
+      }
+      if (this.baked === this.total) worker.terminate();
       onProgress();
     };
-    worker.postMessage({ knot, physics });
+    const defaults = (Object.keys(DEFAULT_PHYSICS) as (keyof RopePhysics)[]).every(
+      (key) => physics[key] === DEFAULT_PHYSICS[key],
+    );
+    if (import.meta.env.PROD && defaults)
+      worker.postMessage({ kind: "load", id: knot.id, particles: this.n, frames: this.total });
+    else simulate();
   }
 
   /** Stops baking; for a timeline that is being replaced. */
@@ -59,10 +83,21 @@ export class Timeline {
   sample(time: number): { positions: Float32Array; normals: Float32Array } {
     const stride = this.n * 3;
     const f = Math.min(Math.max(time, 0), this.ready) * FPS;
-    const i = Math.floor(f);
+    const i = Math.min(Math.floor(f), this.baked - 1);
     const j = Math.min(i + 1, this.baked - 1);
     const a = f - i;
     const { frames, normals, out } = this;
+    if (this.packed) {
+      const data = this.packed;
+      const left = i * stride * 2;
+      const right = j * stride * 2;
+      for (let k = 0; k < stride; k++) {
+        out.positions[k] = (data[left + k] * (1 - a) + data[right + k] * a) / POSITION_SCALE;
+        out.normals[k] =
+          (data[left + stride + k] * (1 - a) + data[right + stride + k] * a) / NORMAL_SCALE;
+      }
+      return out;
+    }
     for (let k = 0; k < stride; k++) {
       out.positions[k] = frames[i * stride + k] * (1 - a) + frames[j * stride + k] * a;
       out.normals[k] = normals[i * stride + k] * (1 - a) + normals[j * stride + k] * a;

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { absoluteUrl } from "../../shared/site";
 import { CheckIcon, ShareIcon } from "../../shared/ui/icons";
 import styles from "./player.module.css";
 
@@ -8,7 +7,7 @@ export function ShareButton({ name, path }: { name: string; path: string }) {
   const [copied, setCopied] = useState(false);
 
   async function share() {
-    const url = absoluteUrl(path);
+    const url = new URL(path, window.location.origin).href;
     try {
       if (navigator.share && matchMedia("(pointer: coarse)").matches) {
         await navigator.share({

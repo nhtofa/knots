@@ -119,8 +119,21 @@ function Session({
                 here where a failure could hurt someone.
               </p>
               <p className={styles.small}>
-                Written for this site and not yet checked against a published knot reference. Spot a
-                mistake?{" "}
+                {info.reference ? (
+                  <>
+                    <a
+                      className={linkClass}
+                      href={info.reference}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Compare with the tying reference
+                    </a>
+                    {" · "}
+                  </>
+                ) : (
+                  "Spot a mistake? "
+                )}
                 <a
                   className={linkClass}
                   href={`${REPO_URL}/blob/main/src/engine/knots/${knot.id}.ts`}
@@ -150,7 +163,8 @@ function Session({
 
 /** The steps as a list; the current one is marked, and a click plays from there. */
 function StepList({ knot, player }: { knot: KnotDef; player: Player }) {
-  const { step } = useSyncExternalStore(player.subscribe, player.getSnapshot, player.getSnapshot);
+  const readStep = () => player.getSnapshot().step;
+  const step = useSyncExternalStore(player.subscribe, readStep, readStep);
   return (
     <ol className={`${styles.list} ${styles.steps}`}>
       {knot.steps.map((s, i) => (

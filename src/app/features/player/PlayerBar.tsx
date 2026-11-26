@@ -36,7 +36,10 @@ export function PlayerBar({
         <span className={styles.stepNum}>
           {s.step + 1}/{steps.length}
         </span>
-        <span aria-live="polite">{steps[s.step].title}</span>
+        <span aria-live="polite">
+          {steps[s.step].title}
+          {s.ready < s.duration && (s.playing || time > s.ready) && " · Preparing animation…"}
+        </span>
       </p>
       <div className={styles.bar}>
         <button
@@ -80,6 +83,18 @@ export function PlayerBar({
           />
         </div>
         <span className={styles.clock}>{time.toFixed(1)}s</span>
+        <select
+          className={styles.mobileSpeed}
+          aria-label="Playback speed"
+          value={s.speed}
+          onChange={(e) => player.setSpeed(Number(e.target.value))}
+        >
+          {SPEEDS.map(({ value, label }) => (
+            <option value={value} key={value}>
+              {label}
+            </option>
+          ))}
+        </select>
         <div className={styles.speed} role="radiogroup" aria-label="Playback speed">
           {SPEEDS.map(({ value, label }) => (
             <label key={value}>
@@ -114,7 +129,12 @@ function useKeyboardShortcuts(player: Player) {
   useMountEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (document.querySelector("dialog[open]")) return;
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLButtonElement) return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLButtonElement ||
+        e.target instanceof HTMLSelectElement
+      )
+        return;
       if (e.key === " ") {
         e.preventDefault();
         player.togglePlay();

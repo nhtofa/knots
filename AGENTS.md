@@ -79,13 +79,13 @@ route /knots/:id → KnotScreen → Session (keyed by knot + physics)
    │  Player.forKnot(knot): plain data, so the prerendered page shows step 1 and the duration
    ▼
 ViewerCanvas mounts → new KnotViewer(canvas) → start(viewer):
-   createKnotSession(knot, player, physics) → Timeline ── posts KnotDef ──▶ sim/worker.ts → bake()
-      Timeline fills frame 0 at once (firstFrame), chunks arrive from the worker → player.setReady
-   viewer.show(session): KnotViewer's loop: player.tick(dt) → timeline.sample(time) → RopeMesh.update → render
+   createKnotSession(knot, player, physics) → Timeline → sim/worker.ts → load packed motion or bake()
+      Timeline shows frame 0 at once (firstFrame), then receives default motion or custom bake chunks → player.setReady
+   viewer.show(session): KnotViewer's loop: player.tick(dt) → timeline.sample(time) → PlaybackRope.update → render
 PlayerBar reads the Player store; its buttons call Player actions
 ```
 
-Frames are baked in a Web Worker while the user watches; playback waits at the edge of what is baked. Before scripts run, the prerendered page shows the whole layout and the knot's picture as a faded poster; the poster fades out once the viewer draws its first frame (the start pose, computed on the main thread), so the page is never empty and nothing shifts.
+A production build prepares compressed 60 Hz motion files for all default lessons. The worker loads and decodes the selected file. Development, custom physics and missing files use the live solver. Playback waits for the whole lesson and scrubbing can show any prepared frame. Before scripts run, the prerendered page shows the whole layout and the knot's picture as a faded poster; the poster fades out once the viewer draws its first frame (the start pose, computed on the main thread), so the page is never empty and nothing shifts.
 
 ### Files
 

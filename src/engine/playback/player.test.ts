@@ -27,11 +27,28 @@ describe("Player", () => {
     expect(p.getSnapshot().time).toBe(0);
   });
 
-  test("waits at the edge of what is baked", () => {
+  test("buffers a slow bake once, then advances without stopping at chunk boundaries", () => {
     const p = make();
     p.setReady(0.5);
     p.tick(2);
-    expect(p.getSnapshot()).toMatchObject({ time: 0.5, playing: true });
+    expect(p.getSnapshot()).toMatchObject({ time: 0, playing: true });
+    p.setReady(1.5);
+    p.tick(0.2);
+    expect(p.getSnapshot().time).toBe(0);
+    p.setReady(3);
+    p.tick(0.2);
+    expect(p.getSnapshot().time).toBe(0.2);
+  });
+
+  test("keeps a seek ahead of the bake and resumes from the selected step", () => {
+    const p = make();
+    p.setReady(0.5);
+    p.seek(2);
+    p.tick(0.2);
+    expect(p.getSnapshot()).toMatchObject({ time: 2, step: 2 });
+    p.setReady(3);
+    p.tick(0.1);
+    expect(p.getSnapshot().time).toBe(2.1);
   });
 
   test("stops at the end, and play starts over", () => {

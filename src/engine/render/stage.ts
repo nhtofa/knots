@@ -26,19 +26,25 @@ export function createPropMesh({ kind, a, b, radius }: Prop): THREE.Mesh {
 }
 
 /** Renderer, camera and a softly lit table for the rope to lie on. */
-export function createStage(canvas: HTMLCanvasElement) {
+export function createStage(canvas: HTMLCanvasElement, interactive = false) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const fullRatio = Math.min(window.devicePixelRatio, interactive ? 1.5 : 2);
+  renderer.setPixelRatio(fullRatio);
   renderer.toneMapping = THREE.NeutralToneMapping;
   renderer.toneMappingExposure = 1.15;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = !interactive;
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(BACKGROUND);
+  scene.background = new THREE.Color(interactive ? "#f7eddb" : BACKGROUND);
   scene.fog = new THREE.Fog(BACKGROUND, 2.2, 4.5);
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  if (!interactive) {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const room = new RoomEnvironment();
+    scene.environment = pmrem.fromScene(room, 0.04).texture;
+    room.dispose();
+    pmrem.dispose();
+  }
   scene.environmentIntensity = 0.9;
 
   const key = new THREE.DirectionalLight("#fff4e8", 2.6);
@@ -67,7 +73,7 @@ export function createStage(canvas: HTMLCanvasElement) {
   );
   table.rotation.x = -Math.PI / 2;
   table.receiveShadow = true;
-  scene.add(table);
+  if (!interactive) scene.add(table);
 
   const camera = new THREE.PerspectiveCamera(30, 1, 0.01, 20);
   camera.position.set(0.02, 1.15, 0.69); // about 60° above the table
@@ -125,6 +131,33 @@ export function createStage(canvas: HTMLCanvasElement) {
   const restored = () => (resized = true);
   canvas.addEventListener("webglcontextrestored", restored);
 
+  // On a slow GPU spend fewer pixels on motion, then restore a sharp still
+  // for inspecting a crossing. Labels and controls always use the screen DPI.
+  let motionRatio = fullRatio;
+  let lastMotion = -Infinity;
+  let sampleStart = 0;
+  let sampleFrames = 0;
+  function adjustResolution(now: number, moving: boolean) {
+    if (moving) {
+      if (now - lastMotion > 250 || sampleFrames === 0) {
+        sampleStart = now;
+        sampleFrames = 0;
+      }
+      lastMotion = now;
+      sampleFrames++;
+      if (now - sampleStart >= 450 && sampleFrames >= 3) {
+        const frameMs = (now - sampleStart) / (sampleFrames - 1);
+        if (frameMs > 26) motionRatio = Math.max(Math.min(0.7, fullRatio), motionRatio * 0.75);
+        sampleFrames = 0;
+      }
+    }
+    const ratio = now - lastMotion > 450 ? fullRatio : motionRatio;
+    if (renderer.getPixelRatio() !== ratio) {
+      renderer.setPixelRatio(ratio);
+      resized = true;
+    }
+  }
+
   return {
     renderer,
     scene,
@@ -137,7 +170,9 @@ export function createStage(canvas: HTMLCanvasElement) {
     render(now: number, sceneChanged = true) {
       const easing = stepReset(now);
       const moved = controls.update(); // also carries damping drift after a drag
-      if (!sceneChanged && !easing && !moved && !viewMoved && !resized) return false;
+      const moving = sceneChanged || easing || moved || viewMoved;
+      if (interactive) adjustResolution(now, moving);
+      if (!moving && !resized) return false;
       viewMoved = resized = false;
       renderer.render(scene, camera);
       return true;
@@ -167,7 +202,6 @@ export function createStage(canvas: HTMLCanvasElement) {
       table.geometry.dispose();
       table.material.dispose();
       scene.environment?.dispose();
-      pmrem.dispose();
       renderer.dispose();
     },
   };

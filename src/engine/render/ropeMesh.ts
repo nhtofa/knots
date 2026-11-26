@@ -72,7 +72,12 @@ export class RopeMesh extends THREE.Mesh<THREE.BufferGeometry, THREE.Material> {
   /** Soft shadow on the table right under the rope, darker the closer the rope lies. */
   private readonly ground: THREE.Mesh;
 
-  constructor(n: number, rope: { length: number; radius: number }, material: THREE.Material) {
+  constructor(
+    n: number,
+    rope: { length: number; radius: number },
+    material: THREE.Material,
+    bodyHairLimit = Infinity,
+  ) {
     const { radius } = rope;
     const m = (n - 1) * SUB + 1;
     const rings = m + 2 * CAP;
@@ -112,7 +117,10 @@ export class RopeMesh extends THREE.Mesh<THREE.BufferGeometry, THREE.Material> {
     this.frustumCulled = false;
 
     // Fibres grow only on the outer half of each strand, where the rope rubs and frays.
-    const body = Math.round((rope.length / radius) * HAIRS_PER_RADIUS * STRANDS);
+    const body = Math.min(
+      bodyHairLimit,
+      Math.round((rope.length / radius) * HAIRS_PER_RADIUS * STRANDS),
+    );
     const count = body + 2 * STRANDS * TUFTS;
     this.ds = rope.length / (n - 1) / SUB;
     // No fibres under the sleeves or on the sealed tips.

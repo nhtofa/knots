@@ -1,7 +1,6 @@
 import * as THREE from "three";
 import type { KnotSession } from "../session";
-import { createRopeMaterial } from "./ropeMaterial";
-import { RopeMesh } from "./ropeMesh";
+import { PlaybackRope, yarnTexture } from "./playbackRope";
 import { createPropMesh, createStage, type Stage } from "./stage";
 
 export const NATURAL_ROPE = "#c39f6a";
@@ -13,17 +12,18 @@ export const NATURAL_ROPE = "#c39f6a";
  */
 export class KnotViewer {
   private readonly stage: Stage;
-  private readonly materials = new Map<string, THREE.Material>();
+  private readonly yarn = yarnTexture();
   private readonly clock = new THREE.Timer();
   private session: KnotSession | null = null;
-  private ropes: RopeMesh[] = [];
+  private ropes: PlaybackRope[] = [];
   private props: THREE.Mesh[] = [];
   private firstDraw: (() => void) | null = null;
   /** Time of the frame the ropes show; NaN until the session's first frame is built. */
   private shownTime = NaN;
 
   constructor(canvas: HTMLCanvasElement) {
-    this.stage = createStage(canvas);
+    this.stage = createStage(canvas, true);
+    this.clock.connect(document);
     this.stage.renderer.setAnimationLoop((now) => this.frame(now));
   }
 
@@ -33,12 +33,8 @@ export class KnotViewer {
     this.session = session;
     this.firstDraw = onFirstDraw ?? null;
     const { knot, timeline } = session;
-    const anisotropy = this.stage.renderer.capabilities.getMaxAnisotropy();
     this.ropes = knot.ropes.map((def, k) => {
-      const color = def.color ?? NATURAL_ROPE;
-      if (!this.materials.has(color))
-        this.materials.set(color, createRopeMaterial(color, anisotropy));
-      const mesh = new RopeMesh(timeline.counts[k], def, this.materials.get(color)!);
+      const mesh = new PlaybackRope(timeline.counts[k], def, this.yarn);
       this.stage.scene.add(mesh);
       return mesh;
     });
@@ -58,7 +54,8 @@ export class KnotViewer {
   dispose() {
     this.stage.renderer.setAnimationLoop(null);
     this.clear();
-    for (const material of this.materials.values()) material.dispose();
+    this.clock.dispose();
+    this.yarn.dispose();
     this.stage.dispose();
   }
 
@@ -69,9 +66,10 @@ export class KnotViewer {
     if (session) {
       session.player.tick(this.clock.getDelta());
       const { timeline } = session;
-      // Clamped as sample() clamps it: while playback waits at the bake edge, the drawn frame
-      // still moves as the edge does. Baked frames never change, so the same time is the same rope.
-      const time = Math.min(Math.max(session.player.getSnapshot().time, 0), timeline.ready);
+      // Keep the last visible pose when a seek requests a frame still loading.
+      const wanted = Math.min(session.player.getSnapshot().time, timeline.duration);
+      const time =
+        wanted <= timeline.ready ? wanted : Number.isFinite(this.shownTime) ? this.shownTime : 0;
       if (time !== this.shownTime) {
         this.shownTime = time;
         changed = true;
@@ -91,15 +89,14 @@ export class KnotViewer {
     }
   }
 
-  /** Removes the shown ropes and props and frees what is theirs; rope materials are shared and kept. */
+  /** Removes the shown ropes and props and releases their geometry and materials. */
   private clear() {
-    const shared = new Set(this.materials.values());
     for (const object of [...this.ropes, ...this.props]) {
       this.stage.scene.remove(object);
       object.traverse((o) => {
         if (!(o instanceof THREE.Mesh)) return;
         o.geometry.dispose();
-        for (const m of [o.material].flat()) if (!shared.has(m)) m.dispose();
+        for (const m of [o.material].flat()) m.dispose();
       });
     }
     this.ropes = [];
