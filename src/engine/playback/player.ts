@@ -70,6 +70,8 @@ export class Player {
     const { playing, ready, duration, loop, speed } = this.snapshot;
     // The first frame's step can be negative (its timestamp predates the clock's start).
     if (!playing || dt <= 0) return;
+    // Keep a requested step selected while its frames are being prepared.
+    if (ready < duration && this.snapshot.time > ready) return;
     const limit = ready < duration ? ready : duration + LOOP_REST;
     const time = Math.min(this.snapshot.time + dt * speed, limit);
     if (time >= duration + (loop ? LOOP_REST : 0)) {

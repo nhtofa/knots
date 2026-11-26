@@ -193,12 +193,25 @@
   color: var(--accent);
 }
 
-/* On a phone the stage is short: the speed and clock make way so the bar stays on one row. */
+.mobileSpeed {
+  display: none;
+}
+/* Use a compact speed selector beside the timeline on a phone. */
 @media (max-width: 560px) {
   .bar {
     gap: 6px;
   }
 
+  .mobileSpeed {
+    display: block;
+    min-height: 34px;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    font: inherit;
+  }
   .speed,
   .clock {
     display: none;

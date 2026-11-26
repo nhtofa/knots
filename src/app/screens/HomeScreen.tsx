@@ -29,8 +29,8 @@ export function HomeScreen() {
               </span>
             </h1>
             <p className={styles.honest}>
-              Not a video. Invisible hands pull a few points of the rope and physics does the rest.
-              Drag to look around.
+              Some lessons keep the turns open so you can follow each crossing. Drag the rope to see
+              which strand passes underneath.
             </p>
             <Link className={styles.go} to={knotPath(first.id)}>
               How to tie the {first.name.toLowerCase()} <span aria-hidden="true">→</span>

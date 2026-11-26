@@ -32,11 +32,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export const links = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
-  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
   {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400..800&display=swap",
+    rel: "preload",
+    as: "font",
+    type: "font/woff2",
+    href: "/fonts/schibsted-grotesk-latin.woff2",
+    crossOrigin: "anonymous",
   },
 ];
 

@@ -34,11 +34,19 @@ export class KnotViewer {
     this.firstDraw = onFirstDraw ?? null;
     const { knot, timeline } = session;
     const anisotropy = this.stage.renderer.capabilities.getMaxAnisotropy();
+    // Budget surface fibres across the interactive scene. Offline film renders
+    // keep the full fibre density, and every simulated crossing stays intact.
+    const hairBudget = 8000;
     this.ropes = knot.ropes.map((def, k) => {
       const color = def.color ?? NATURAL_ROPE;
       if (!this.materials.has(color))
         this.materials.set(color, createRopeMaterial(color, anisotropy));
-      const mesh = new RopeMesh(timeline.counts[k], def, this.materials.get(color)!);
+      const mesh = new RopeMesh(
+        timeline.counts[k],
+        def,
+        this.materials.get(color)!,
+        Math.round((hairBudget * timeline.counts[k]) / timeline.n),
+      );
       this.stage.scene.add(mesh);
       return mesh;
     });

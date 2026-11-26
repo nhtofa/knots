@@ -16,13 +16,18 @@ test("a knot page bakes, plays, steps and scrubs", async ({ page }) => {
   await expect(page.locator("[data-baked=true]")).toBeVisible({ timeout: 60_000 });
 
   // Reduced motion: the knot waits for the play button.
-  const play = page.getByRole("button", { name: "Play" });
+  const play = page.getByRole("button", { name: "Play", exact: true });
   await expect(play).toHaveAttribute("aria-pressed", "false");
   await play.click();
-  await expect(page.getByRole("button", { name: "Pause" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Pause", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
 
   await page.getByRole("button", { name: /^Step 4:/ }).click();
-  await expect(page.getByLabel("Playback")).toContainText("Pull both ends to tighten");
+  await expect(page.getByRole("region", { name: "Playback", exact: true })).toContainText(
+    "Pull both ends to tighten",
+  );
   expect(errors).toEqual([]);
 });
 
@@ -32,7 +37,7 @@ test.describe("without JavaScript", () => {
   test("the prerendered page has the whole layout, the poster and share tags", async ({ page }) => {
     await page.goto("/knots/zeppelin/");
     await expect(page.getByRole("heading", { name: "Zeppelin bend" })).toBeVisible();
-    await expect(page.getByLabel("Playback")).toContainText("1/7");
+    await expect(page.getByRole("region", { name: "Playback", exact: true })).toContainText("1/7");
     await expect(page.getByRole("button", { name: /^Step 7:/ })).toBeAttached();
     await expect(page.locator('img[src="/og/zeppelin.jpg"]').first()).toBeVisible();
     // At least the first few knots; an exact count would break every time a knot is added.
@@ -112,4 +117,31 @@ test("old ?knot= links redirect and unknown pages are a 404", async ({ page }) =
   const response = await page.goto("/knots/no-such-knot/");
   expect(response?.status()).toBe(404);
   await expect(page.getByRole("heading", { name: /isn’t here/ })).toBeVisible();
+});
+
+test("the essentials collection combines search, jobs and shareable filters", async ({ page }) => {
+  await page.goto("/");
+  const catalog = page.getByRole("region", { name: "Knot library" });
+  await catalog.getByRole("button", { name: "20 essentials" }).click();
+  await expect(catalog.getByRole("link")).toHaveCount(20);
+  await catalog.getByRole("searchbox").fill("weaver's");
+  await expect(catalog.getByRole("link")).toHaveCount(1);
+  await expect(catalog.getByRole("heading", { name: "Sheet bend" })).toBeVisible();
+  await page.reload();
+  await expect(catalog.getByRole("link")).toHaveCount(1);
+  await catalog.getByRole("button", { name: "Tie to a post" }).click();
+  await expect(catalog.getByRole("status")).toHaveText("No matching knots");
+  await catalog.getByRole("button", { name: "Clear filters" }).click();
+  await expect(catalog.getByRole("link", { name: /Zeppelin bend/ })).toBeVisible();
+});
+
+test("a new knot can be slowed down and scrubbed on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/knots/larks-head/");
+  const player = page.getByRole("region", { name: "Playback" });
+  await expect(player).toHaveAttribute("data-baked", "true", { timeout: 60000 });
+  await player.getByRole("combobox", { name: "Playback speed" }).selectOption("0.25");
+  await expect(player.getByRole("combobox")).toHaveValue("0.25");
+  await player.getByRole("slider").press("End");
+  await expect(player).toContainText("Find the two turns and the collar");
 });
