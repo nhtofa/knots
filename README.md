@@ -52,7 +52,9 @@ pnpm install
 pnpm dev
 ```
 
-Run `pnpm build` for the static site in `build/client`. Set `VITE_SITE_URL` to your deployment origin before building to set its canonical and share-preview URLs.
+Run `pnpm build` for the static site in `build/client`. The build prepares a compressed 60-frame-per-second motion file for each lesson. Leave the `motion/` directory with the other built files when serving or copying the site. Opening a knot loads only its motion file. Custom rope settings run the simulation in a worker and start playing when all frames are ready.
+
+Set `VITE_SITE_URL` to your deployment origin before building to set its canonical and share-preview URLs.
 
 React, React Router and three.js, no physics library. [AGENTS.md](AGENTS.md) explains how it fits
 together and how to add a knot.

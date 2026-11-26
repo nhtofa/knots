@@ -163,7 +163,8 @@ function Session({
 
 /** The steps as a list; the current one is marked, and a click plays from there. */
 function StepList({ knot, player }: { knot: KnotDef; player: Player }) {
-  const { step } = useSyncExternalStore(player.subscribe, player.getSnapshot, player.getSnapshot);
+  const readStep = () => player.getSnapshot().step;
+  const step = useSyncExternalStore(player.subscribe, readStep, readStep);
   return (
     <ol className={`${styles.list} ${styles.steps}`}>
       {knot.steps.map((s, i) => (

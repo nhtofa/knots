@@ -5,15 +5,13 @@ const railY = 0.066;
 const width = 0.056;
 // A folded cord straddles the rail, with the fold on the far side. Both
 // legs follow the same profile, giving the bight room to swing back under.
-const leg: Vec3[] = [
-  [-width, R, 0.23],
-  [-width, R, 0.1],
-  [-width, 0.06, 0.034],
-  [-width, 0.097, 0],
-  [-width, 0.06, -0.034],
-  [-width, R, -0.1],
-  [-width, R, -0.22],
-];
+// A rounded drape clears the post from the first frame. Sharp elbows make
+// the rod spring away from its starting pose when the solver first advances.
+const leg: Vec3[] = Array.from({ length: 31 }, (_, i) => {
+  const z = 0.23 - (0.45 * i) / 30;
+  const rise = Math.abs(z) < 0.12 ? 0.045 * (1 + Math.cos((Math.PI * z) / 0.12)) : 0;
+  return [-width, R + rise, z];
+});
 const start: Vec3[] = [...leg];
 for (let i = 1; i < 12; i++) {
   const a = (i * Math.PI) / 12;

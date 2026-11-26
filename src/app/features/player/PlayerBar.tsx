@@ -38,7 +38,7 @@ export function PlayerBar({
         </span>
         <span aria-live="polite">
           {steps[s.step].title}
-          {s.ready < s.duration && time > s.ready && " · Preparing step…"}
+          {s.ready < s.duration && (s.playing || time > s.ready) && " · Preparing animation…"}
         </span>
       </p>
       <div className={styles.bar}>

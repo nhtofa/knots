@@ -1,3 +1,4 @@
+import { motionFilename } from "../src/engine/knots/fingerprints";
 import { expect, test, type Page } from "@playwright/test";
 
 type Win = Window & { cls: number; marker?: number };
@@ -144,4 +145,44 @@ test("a new knot can be slowed down and scrubbed on a phone", async ({ page }) =
   await expect(player.getByRole("combobox")).toHaveValue("0.25");
   await player.getByRole("slider").press("End");
   await expect(player).toContainText("Find the two turns and the collar");
+});
+
+test("a long lesson plays from its packaged motion and can seek immediately", async ({ page }) => {
+  const loaded = page
+    .context()
+    .waitForEvent(
+      "response",
+      (response) =>
+        response.url().endsWith("/motion/" + motionFilename("truckers-hitch")) && response.ok(),
+    );
+  await page.goto("/knots/truckers-hitch/");
+  await loaded;
+  await expect(page.locator("[data-baked=true]")).toBeVisible();
+  const bar = page.getByRole("slider", { name: "Timeline" });
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect.poll(async () => Number(await bar.inputValue())).toBeGreaterThan(0.4);
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  await bar.focus();
+  await page.keyboard.press("End");
+  expect(Number(await bar.inputValue())).toBe(Number(await bar.getAttribute("max")));
+});
+
+test("a damaged motion file falls back to the solver and custom physics bypasses it", async ({
+  page,
+  context,
+}) => {
+  let loads = 0;
+  await context.route("**/motion/**", async (route) => {
+    loads++;
+    await route.fulfill({ contentType: "application/octet-stream", body: "damaged file" });
+  });
+  for (const query of ["", "?tune&mass=2.1"]) {
+    await page.goto("/knots/overhand/" + query);
+    await expect(page.locator("[data-baked=true]")).toBeVisible({ timeout: 60000 });
+    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await expect
+      .poll(async () => Number(await page.getByRole("slider", { name: "Timeline" }).inputValue()))
+      .toBeGreaterThan(0.1);
+    expect(loads).toBe(1);
+  }
 });

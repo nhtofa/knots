@@ -1,4 +1,5 @@
 import { copyFile, writeFile } from "node:fs/promises";
+import { buildMotion } from "./tools/buildMotion";
 import type { Config } from "@react-router/dev/config";
 import { knots } from "./src/engine/knots";
 import { SITE_URL, knotPath } from "./src/app/shared/site";
@@ -9,6 +10,7 @@ export default {
   ssr: false,
   prerender: ["/", ...knots.map((k) => knotPath(k.id))],
   async buildEnd({ reactRouterConfig: { buildDirectory } }) {
+    await buildMotion(knots, `${buildDirectory}/client`);
     const siteOrigin = process.env.VITE_SITE_URL || SITE_URL;
     const absoluteUrl = (path: string) => new URL(path, siteOrigin).href;
     const urls = ["/", ...knots.map((k) => knotPath(k.id))].map(
